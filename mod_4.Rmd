@@ -1,0 +1,163 @@
+---
+title: "Modulo IV: Ciencia de Datos: Modelos Predictivos II"
+author: "Hugo Donoso Reinoso"
+date: "2024-08-12"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+
+library(pROC)
+library(openxlsx)
+library(gmodels)
+library(ResourceSelection)
+library(ROCR)
+library(Epi)
+library(QuantPsyc)
+library(ggplot2)
+library(memisc)
+library(readxl)
+library(openxlsx)
+library (ggplot2)
+library(reshape2)
+library(dplyr)
+library(readxl)
+library(readr)
+library(dplyr)
+library(lubridate)
+library(stats)
+library(readr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+
+db<-read.csv("E:\\Betametrica\\Modulo IV\\germancredit.csv")
+attach(db)
+
+names(db)
+
+str(db)
+Default <- as.factor(db$Default)
+db$duration<-as.numeric(db$duration)
+
+logit_model <- glm(Default ~ duration + amount + installment+ age + I(age^2) + cards,
+                   data = db, family = binomial(link = "logit"))
+
+
+probit_model <- glm(Default ~duration   + amount + installment + age + I(age^2) + cards,
+                    data = db, family = binomial(link = "probit"))
+summary(logit_model)
+summary(probit_model)
+```
+
+
+# Predicciones para el modelo logit y probit
+```{r}
+logit_preds <- predict(logit_model, type = "response")
+probit_preds <- predict(probit_model, type = "response")
+```
+
+# Curva ROC para el modelo logit
+```{r}
+roc_logit <- roc(db$Default, logit_preds)
+plot(roc_logit, main = "Curva ROC - Logit")
+auc(roc_logit)
+```
+
+
+# Curva ROC para el modelo probit
+
+```{r}
+roc_probit <- roc(db$Default, probit_preds)
+plot(roc_probit, main = "Curva ROC - Probit")
+auc(roc_probit)
+
+```
+
+
+
+# Umbral óptimo para el modelo logit
+
+```{r}
+optimal_cut_logit <- coords(roc_logit, "best", ret = "threshold")
+optimal_cut_logit <- as.numeric(optimal_cut_logit[1])
+
+```
+
+
+# Matriz de confusión para el modelo logit
+
+```{r}
+table(db$Default, logit_preds > optimal_cut_logit)
+
+```
+
+
+# Umbral óptimo para el modelo probit
+```{r}
+optimal_cut_probit <- coords(roc_probit, "best", ret = "threshold")
+optimal_cut_probit <- as.numeric(optimal_cut_probit[1])
+optimal_cut_probit
+```
+
+
+
+# Matriz de confusión para el modelo probit
+
+```{r}
+table(db$Default, probit_preds > optimal_cut_probit)
+
+```
+
+
+# Test de Hosmer-Lemeshow para logit
+```{r}
+hoslem.test(db$Default, fitted(logit_model), g = 10)
+
+```
+
+
+
+# Test de Hosmer-Lemeshow para probit
+```{r}
+hoslem.test(db$Default, fitted(probit_model), g = 10)
+
+
+```
+
+
+
+# Crear un nuevo dataframe con valores hipotéticos
+```{r}
+hypothetical <- data.frame(duration = c(24, 36), amount = c(5000, 10000), installment = c(2,3), 
+                           age = c(35, 50), age2 = c(35^2, 50^2), cards = c(2, 3))
+
+hypothetical
+```
+
+
+
+# Predecir con el modelo logit
+
+```{r}
+hypothetical$logit_pred <- predict(logit_model, newdata = hypothetical, type = "response")
+```
+
+
+
+# Predecir con el modelo probit
+```{r}
+hypothetical$probit_pred <- predict(probit_model, newdata = hypothetical, type = "response")
+```
+
+
+
+# Mostrar los valores y proyecciones
+```{r}
+print(hypothetical)
+```
+
+Se expresa que no hay muchas diferencias en los modelos sin embargo el modelo Probit en medidas como el AIC indica que es marginalmente mejor en términos de ajuste y simplicidad.
